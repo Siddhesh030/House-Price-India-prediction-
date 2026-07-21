@@ -6,14 +6,19 @@ from flask import Flask, request, render_template_string
 
 app = Flask(__name__)
 
-# Automatically look for your pickle file, even if it's named model (2).pkl or model.pkl
+# Debugging helper: This will print the contents of your directory in the Render logs
+print("Current Working Directory:", os.getcwd())
+print("Files visible in directory:", os.listdir("."))
+
 def load_model():
-    possible_files = glob.glob("model*.pkl")
+    # Looks for any pickle file starting with 'model' or 'house'
+    possible_files = glob.glob("model*.pkl") + glob.glob("house*.pkl")
     if possible_files:
-        # Pick the first matching pickle file found
         model_path = possible_files[0]
+        print(f"Success: Found and loading model file -> {model_path}")
         with open(model_path, "rb") as f:
             return pickle.load(f)
+    print("ERROR: No .pkl file found in the repository root directory!")
     return None
 
 model = load_model()
@@ -95,16 +100,17 @@ HTML_TEMPLATE = """
             font-size: 1rem;
         }
 
-        /* Dynamic Error Display */
         .error-banner {
             background: rgba(239, 68, 68, 0.1);
             border: 1px solid rgba(239, 68, 68, 0.2);
             color: #f87171;
-            padding: 1rem 1.5rem;
+            padding: 1.2rem 1.5rem;
             border-radius: 12px;
             margin-bottom: 2rem;
-            text-align: center;
+            text-align: left;
             font-weight: 500;
+            font-size: 0.9rem;
+            line-height: 1.5;
             animation: shake 0.4s linear;
         }
 
@@ -180,7 +186,6 @@ HTML_TEMPLATE = """
             box-shadow: 0 15px 30px -5px rgba(99, 102, 241, 0.6);
         }
 
-        /* Result Module Animation */
         .result-card {
             margin-top: 3rem;
             padding: 2.5rem;
@@ -217,14 +222,14 @@ HTML_TEMPLATE = """
 
     <div class="container">
         <div class="header">
-            <h1>Property Valuation Engine</h1>
-            <p class="subtitle">Provide features below to parse real-time statistical inference.</p>
+            <h1>House Price Prediction Engine</h1>
+            <p class="subtitle">Provide property features below to fetch real-time valuations.</p>
         </div>
 
-        <!-- Dynamic Warning if Pickle File completely missing -->
         {% if error_msg %}
         <div class="error-banner">
-            ⚠️ {{ error_msg }}
+            <strong>⚠️ Deployment Setup Warning:</strong><br>
+            {{ error_msg }}
         </div>
         {% endif %}
         
@@ -316,7 +321,9 @@ HTML_TEMPLATE = """
 
 @app.route("/", methods=["GET"])
 def home():
-    error_msg = None if model else "Model file (model.pkl) not found in directory. Please upload your pickle file."
+    error_msg = None
+    if not model:
+        error_msg = f"Model file missing! Found these files instead: {str(os.listdir('.'))}. Make sure your model file is pushed to the root folder of your repository."
     return render_template_string(HTML_TEMPLATE, inputs={}, prediction=None, error_msg=error_msg)
 
 @app.route("/predict", methods=["POST"])
@@ -325,7 +332,7 @@ def predict():
     if not model:
         model = load_model()
         if not model:
-            return render_template_string(HTML_TEMPLATE, inputs=request.form, prediction=None, error_msg="Prediction failed: Model file is missing.")
+            return render_template_string(HTML_TEMPLATE, inputs=request.form, prediction=None, error_msg="Prediction engine offline. The .pkl file is missing from your project repository.")
     
     try:
         features = [
